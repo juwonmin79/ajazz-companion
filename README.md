@@ -32,8 +32,8 @@ python3 -m venv .venv
 .venv/bin/python3 main.py
 ```
 
-> **macOS permission required**
-> - System Settings → Privacy & Security → **Input Monitoring** → add python3
+> **macOS permission required**  
+> System Settings → Privacy & Security → **Input Monitoring** → click `+` → add `python3` from `.venv/bin/`
 
 ---
 
