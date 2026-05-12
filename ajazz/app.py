@@ -18,6 +18,8 @@ AJAZZ Companion — macOS 메뉴바 앱
 """
 
 import logging
+import signal
+import threading
 from datetime import datetime
 
 import rumps
@@ -83,12 +85,15 @@ class AjazzCompanionApp(rumps.App):
         self._clock   = ClockSyncer(on_status_change=self._on_clock_status)
         self._battery = BatteryMonitor(on_update=self._on_battery_update)
 
+        self._shutdown_lock = threading.Lock()
+        self._shutdown_done = False
+
         # ── 메뉴 항목 ──────────────────────────────
         # 메뉴 dict 키는 생성자의 title로 결정되므로 안정적인 ID 문자열 사용.
         # 실제 표시 텍스트는 _set_row() 가 attributedTitle 로 덮어씀.
         self._item_clock = rumps.MenuItem("clock_row",   callback=self.on_clock_click)
         self._item_battery = rumps.MenuItem("battery_row", callback=self.on_battery_click)
-        self._item_quit  = rumps.MenuItem("Quit", callback=rumps.quit_application)
+        self._item_quit  = rumps.MenuItem("Quit", callback=self._on_quit_click)
 
         # 초기 라벨
         _set_row(self._item_clock,   "🕐 --:--:--",  "↻")
@@ -107,9 +112,49 @@ class AjazzCompanionApp(rumps.App):
     # ─────────────────────────────────────────────
 
     def launch(self):
+        self._install_signal_handlers()
         self._clock.start()
         self._battery.start()
         self.run()
+
+    # ─────────────────────────────────────────────
+    #  종료 처리 (SIGTERM/SIGINT → HID 워커 stop → quit)
+    # ─────────────────────────────────────────────
+
+    def _install_signal_handlers(self):
+        # launchd/터미널 종료 시 HID 패킷이 도중에 전송되지 않도록
+        # 모니터를 먼저 stop하고 앱을 내린다.
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            try:
+                signal.signal(sig, self._on_signal)
+            except (ValueError, OSError):
+                # 메인 스레드가 아니거나 핸들 불가한 시그널이면 스킵
+                pass
+
+    def _on_signal(self, signum, *_):
+        logger.info(f"Received signal {signum} → shutting down")
+        self._shutdown()
+
+    def _on_quit_click(self, _):
+        logger.info("Quit menu clicked → shutting down")
+        self._shutdown()
+
+    def _shutdown(self):
+        with self._shutdown_lock:
+            if self._shutdown_done:
+                return
+            self._shutdown_done = True
+
+        try:
+            self._clock.stop()
+        except Exception as e:
+            logger.warning(f"ClockSyncer stop failed: {e}")
+        try:
+            self._battery.stop()
+        except Exception as e:
+            logger.warning(f"BatteryMonitor stop failed: {e}")
+
+        rumps.quit_application()
 
     # ─────────────────────────────────────────────
     #  메뉴 클릭 핸들러

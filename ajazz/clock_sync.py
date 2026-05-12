@@ -22,6 +22,7 @@ from .protocol import find_devices, build_clock_packet
 logger = logging.getLogger(__name__)
 
 SYNC_INTERVAL = 15  # 초
+INITIAL_DELAY = 4   # 초 (마우스 초기화 완료 대기)
 
 
 class ClockSyncer:
@@ -67,6 +68,12 @@ class ClockSyncer:
     # ─────────────────────────────
 
     def _loop(self):
+        # 첫 동기화 전 초기 딜레이: 마우스 USB 초기화 완료 대기
+        for _ in range(INITIAL_DELAY * 2):
+            if not self._running:
+                return
+            threading.Event().wait(0.5)
+
         while self._running:
             self._sync_once()
             # SYNC_INTERVAL 동안 0.5초마다 중단 여부 확인
