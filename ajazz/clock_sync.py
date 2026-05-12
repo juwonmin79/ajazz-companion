@@ -22,7 +22,7 @@ from .protocol import find_devices, build_clock_packet
 logger = logging.getLogger(__name__)
 
 SYNC_INTERVAL = 15  # 초
-INITIAL_DELAY = 4   # 초 (마우스 초기화 완료 대기)
+POLL_INTERVAL = 0.5  # 초 (연결 대기 중 enumerate 폴링 주기)
 
 
 class ClockSyncer:
@@ -68,19 +68,23 @@ class ClockSyncer:
     # ─────────────────────────────
 
     def _loop(self):
-        # 첫 동기화 전 초기 딜레이: 마우스 USB 초기화 완료 대기
-        for _ in range(INITIAL_DELAY * 2):
+        # 연결 대기 중에는 POLL_INTERVAL로 빠르게 enumerate.
+        # 디바이스 감지되는 순간 즉시 sync 1회 → 이후 SYNC_INTERVAL 주기.
+        while self._running:
+            if find_devices():
+                self._sync_once()
+                self._interruptible_wait(SYNC_INTERVAL)
+            else:
+                self._set_connected(False)
+                self._interruptible_wait(POLL_INTERVAL)
+
+    def _interruptible_wait(self, seconds: float):
+        steps = max(1, int(seconds / 0.5))
+        step = seconds / steps
+        for _ in range(steps):
             if not self._running:
                 return
-            threading.Event().wait(0.5)
-
-        while self._running:
-            self._sync_once()
-            # SYNC_INTERVAL 동안 0.5초마다 중단 여부 확인
-            for _ in range(SYNC_INTERVAL * 2):
-                if not self._running:
-                    break
-                threading.Event().wait(0.5)
+            threading.Event().wait(step)
 
     def _sync_once(self) -> bool:
         """
