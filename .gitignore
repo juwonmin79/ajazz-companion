@@ -4,3 +4,4 @@ build/
 __pycache__/
 *.pyc
 settings.local.json
+settings.local.json
