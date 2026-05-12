@@ -6,7 +6,7 @@ macOS menu bar app for AJAZZ 2.4G 8K wireless mouse dock.
 |---|:---:|
 | 🕒 **Clock Sync** — Auto-sync dock clock (15s interval) | ✅ |
 | 🔋 **Battery** — Live battery % in menu bar | ✅ |
-| 🎞️ **GIF Upload** — GIF → dock screen | 🚧 v3 |
+| 🎞️ **GIF Upload** — GIF → dock screen | 🚧 v3 planned |
 
 ---
 
@@ -32,7 +32,8 @@ python3 -m venv .venv
 .venv/bin/python3 main.py
 ```
 
-> **macOS permission required** — System Settings → Privacy & Security → Input Monitoring → add python3
+> **macOS permission required**
+> - System Settings → Privacy & Security → **Input Monitoring** → add python3
 
 ---
 
@@ -54,6 +55,7 @@ No Wireshark or USBPcap needed — reverse engineered via **WebHID hooking** in 
 Hook HIDDevice.prototype in Chrome DevTools
 → Capture 0xf7 polling magic byte (OUT)
 → IN response byte[2] = battery %
+  (hidapi prepends Report ID, so actual index is resp[3])
 ```
 
 ---
